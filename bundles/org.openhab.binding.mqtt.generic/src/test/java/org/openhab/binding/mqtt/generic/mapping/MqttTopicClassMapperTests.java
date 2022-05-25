@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2010-2021 Contributors to the openHAB project
+ * Copyright (c) 2010-2022 Contributors to the openHAB project
  *
  * See the NOTICE file(s) distributed with this work for additional
  * information.
@@ -210,5 +210,26 @@ public class MqttTopicClassMapperTests {
         }
 
         assertThat(future.isDone(), is(true));
+    }
+
+    @Test
+    public void ignoresInvalidEnum() throws IllegalArgumentException, IllegalAccessException {
+        final Attributes attributes = spy(new Attributes());
+
+        doAnswer(this::createSubscriberAnswer).when(attributes).createSubscriber(any(), any(), anyString(),
+                anyBoolean());
+
+        verify(connection, times(0)).subscribe(anyString(), any());
+
+        // Subscribe now to all fields
+        CompletableFuture<Void> future = attributes.subscribeAndReceive(connection, executor, "homie/device123",
+                fieldChangedObserver, 10);
+        assertThat(future.isDone(), is(true));
+
+        SubscribeFieldToMQTTtopic field = attributes.subscriptions.stream().filter(f -> f.field.getName() == "state")
+                .findFirst().get();
+        field.processMessage(field.topic, "garbage".getBytes());
+        verify(fieldChangedObserver, times(0)).attributeChanged(any(), any(), any(), any(), anyBoolean());
+        assertThat(attributes.state.toString(), is("unknown"));
     }
 }
